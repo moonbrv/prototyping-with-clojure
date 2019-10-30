@@ -6,7 +6,8 @@
     [visitera.config :refer [env]]
     [clojure.tools.cli :refer [parse-opts]]
     [clojure.tools.logging :as log]
-    [mount.core :as mount])
+    [mount.core :as mount]
+    [visitera.db.core :as dbcore])
   (:gen-class))
 
 ;; log uncaught exceptions in threads
@@ -51,6 +52,7 @@
                         (parse-opts cli-options)
                         mount/start-with-args
                         :started)]
+    (dbcore/install-schema dbcore/conn)
     (log/info component "started"))
   (.addShutdownHook (Runtime/getRuntime) (Thread. stop-app)))
 
