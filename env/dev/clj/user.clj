@@ -6,7 +6,8 @@
     [expound.alpha :as expound]
     [mount.core :as mount]
     [visitera.figwheel :refer [start-fw stop-fw cljs]]
-    [visitera.core :refer [start-app]]))
+    [visitera.core :refer [start-app]]
+    [visitera.db.core :refer [conn install-schema delete-database]]))
 
 (alter-var-root #'s/*explain-out* (constantly expound/printer))
 
@@ -29,4 +30,9 @@
   (stop)
   (start))
 
+(defn reset-db
+  "Delete database and restart application"
+  []
+  (delete-database)
+  (restart))
 

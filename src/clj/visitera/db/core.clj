@@ -6,8 +6,8 @@
     [visitera.config :refer [env]]))
 
 (defstate conn
-  :start (do (-> env :database-url d/create-database) (-> env :database-url d/connect))
-  :stop (-> conn .release))
+          :start (do (-> env :database-url d/create-database) (-> env :database-url d/connect))
+          :stop (-> conn .release))
 
 (defn install-schema
   "This function expected to be called at system start up.
@@ -42,16 +42,10 @@
   (seq (d/tx-range (d/log conn) nil nil)))
 
 (defn add-user
-  "e.g.
-    (add-user conn {:id \"aaa\"
-                    :screen-name \"AAA\"
-                    :status :user.status/active
-                    :email \"aaa@example.com\" })"
-  [conn {:keys [id screen-name status email]}]
-  @(d/transact conn [{:user/id         id
-                      :user/name       screen-name
-                      :user/status     status
-                      :user/email      email}]))
+  [conn {:keys [email password]}]
+  (when-not (find-one-by (d/db conn) :user/email email)
+    @(d/transact conn [{:user/email    email
+                        :user/password password}])))
 
 (defn find-one-by
   "Given db value and an (attr/val), return the user as EntityMap (datomic.query.EntityMap)
@@ -71,5 +65,9 @@
                  db attr val)))
 
 
-(defn find-user [db id]
-  (d/touch (find-one-by db :user/id id)))
+(defn find-user [db email]
+  (d/touch (find-one-by db :user/email email)))
+
+(defn delete-database
+  []
+  (-> env :database-url d/delete-database))
