@@ -3,7 +3,8 @@
     [datomic.api :as d]
     [io.rkn.conformity :as c]
     [mount.core :refer [defstate]]
-    [visitera.config :refer [env]]))
+    [visitera.config :refer [env]]
+    [clojure.string :as cstr]))
 
 (defstate conn
           :start (do (-> env :database-url d/create-database) (-> env :database-url d/connect))
@@ -41,12 +42,6 @@
   [conn]
   (seq (d/tx-range (d/log conn) nil nil)))
 
-(defn add-user
-  [conn {:keys [email password]}]
-  (when-not (find-one-by (d/db conn) :user/email email)
-    @(d/transact conn [{:user/email    email
-                        :user/password password}])))
-
 (defn find-one-by
   "Given db value and an (attr/val), return the user as EntityMap (datomic.query.EntityMap)
    If there is no result, return nil.
@@ -64,6 +59,47 @@
                    :where [?e ?attr ?val]]
                  db attr val)))
 
+(defn add-user
+  [conn {:keys [email password]}]
+  (when-not (find-one-by (d/db conn) :user/email email)
+    @(d/transact conn [{:user/email    email
+                        :user/password password}])))
+
+(defn get-country-id-by-alpha-3 [db alpha-3]
+  (-> (find-one-by db :country/alpha-3 alpha-3)
+      d/touch
+      :db/id))
+
+(defn concat-keyword [part-1 part-2]
+  (let [name-1 (cstr/replace part-1 #"^:" "")
+        name-2 (name part-2)]
+    (-> (str name-1 name-2)
+        keyword)))
+
+(defn remove-from-countries [type conn user-email alpha-3]
+  "remove country from list"
+  (let [user-id (-> (find-user (d/db conn) user-email)
+                    :db/id)
+        country-id (get-country-id-by-alpha-3 (d/db conn) alpha-3)
+        attr (concat-keyword :user/countries- type)]
+    @(d/transact conn [[:db/retract user-id attr country-id]])))
+
+(defn add-to-countries [type conn user-email alpha-3]
+  "add country to visited list"
+  (when-let [country-id (get-country-id-by-alpha-3 (d/db conn) alpha-3)]
+    (case type
+      :visited (remove-from-countries :to-visit conn user-email alpha-3)
+      :to-visit (remove-from-countries :visited conn user-email alpha-3))
+    (let [attr (concat-keyword :user/countries- type)
+          tx-user {:user/email user-email
+                   attr        [country-id]}]
+      @(d/transact conn [tx-user]))))
+
+(defn get-countries [db user-email]
+  (d/q '[:find (pull ?e [{:user/countries-to-visit [:country/alpha-3]}
+                         {:user/countries-visited [:country/alpha-3]}])
+         :in $ ?user-email
+         :where [?e :user/email ?user-email]] db user-email))
 
 (defn find-user [db email]
   (d/touch (find-one-by db :user/email email)))
