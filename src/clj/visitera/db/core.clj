@@ -4,6 +4,7 @@
     [io.rkn.conformity :as c]
     [mount.core :refer [defstate]]
     [visitera.config :refer [env]]
+    [buddy.hashers :as hs]
     [clojure.string :as cstr]))
 
 (defstate conn
@@ -59,11 +60,14 @@
                    :where [?e ?attr ?val]]
                  db attr val)))
 
+(defn find-user [db email]
+  (d/touch (find-one-by db :user/email email)))
+
 (defn add-user
   [conn {:keys [email password]}]
   (when-not (find-one-by (d/db conn) :user/email email)
     @(d/transact conn [{:user/email    email
-                        :user/password password}])))
+                        :user/password (hs/derive password)}])))
 
 (defn get-country-id-by-alpha-3 [db alpha-3]
   (-> (find-one-by db :country/alpha-3 alpha-3)
@@ -100,9 +104,6 @@
                          {:user/countries-visited [:country/alpha-3]}])
          :in $ ?user-email
          :where [?e :user/email ?user-email]] db user-email))
-
-(defn find-user [db email]
-  (d/touch (find-one-by db :user/email email)))
 
 (defn delete-database
   []

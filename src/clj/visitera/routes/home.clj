@@ -5,16 +5,29 @@
     [visitera.middleware :as middleware]
     [ring.util.http-response :as response]
     [visitera.db.core :as dbcore]
+    [visitera.validation :refer [validate-register]]
     [datomic.api :as d]))
 
-(defn home-page [request]
-  (layout/render request "home.html"))
+(defn register-handler! [{:keys [params]}]
+  (if-let [errors (validate-register params)]
+    (-> (response/found "/register")
+        (assoc :flash {:errors errors
+                       :email  (:email params)}))
+    (if-not (dbcore/add-user dbcore/conn params)
+      (-> (response/found "/register")
+          (assoc :flash {:errors {:email "User with this email already exist"}
+                         :email  (:email params)}))
+      (-> (response/found "/login")
+          (assoc :flash {:messages {:success "You are successfuly registered"}
+                         :email    (:email params)})))))
 
 (defn home-routes []
   [""
    {:middleware [middleware/wrap-csrf
                  middleware/wrap-formats]}
-   ["/" {:get home-page}]
+   ["/" {:get layout/home-page}]
+   ["/register" {:get  layout/register-page
+                 :post register-handler!}]
    ["/docs" {:get (fn [_]
                     (-> (response/ok (-> "docs/docs.md" io/resource slurp))
                         (response/header "Content-Type" "text/plain; charset=utf-8")))}]
