@@ -61,7 +61,8 @@
                  db attr val)))
 
 (defn find-user [db email]
-  (d/touch (find-one-by db :user/email email)))
+  (if-let [user-id (find-one-by db :user/email email)]
+    (d/touch user-id)))
 
 (defn add-user
   [conn {:keys [email password]}]
